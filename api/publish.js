@@ -35,22 +35,20 @@ function getCookie(req, name) {
     .map((c) => c.trim())
     .find((c) => c.startsWith(name + "="));
 
-  if (!match) return null;
-
-  return match.substring(name.length + 1);
+  return match
+    ? match.substring(name.length + 1)
+    : null;
 }
 
 async function getSession(req) {
-  const encryptedSession = getCookie(
+  const encrypted = getCookie(
     req,
     "tiktok_session"
   );
 
-  if (!encryptedSession) {
-    throw new Error("NO_SESSION");
-  }
+  if (!encrypted) throw new Error("NO_SESSION");
 
-  const session = decryptSession(encryptedSession);
+  const session = decryptSession(encrypted);
 
   if (
     !session.access_token ||
@@ -69,8 +67,7 @@ async function queryCreator(accessToken) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Content-Type":
-          "application/json; charset=UTF-8",
+        "Content-Type": "application/json; charset=UTF-8",
       },
     }
   );
@@ -84,7 +81,7 @@ async function queryCreator(accessToken) {
     throw new Error(
       result.error?.message ||
       result.error?.code ||
-      "CREATOR_INFO_FAILED"
+      "Creator Info failed"
     );
   }
 
@@ -95,284 +92,361 @@ export default async function handler(req, res) {
   try {
     const session = await getSession(req);
 
+    // ==========================
+    // PAGE DE PUBLICATION
+    // ==========================
+
     if (req.method === "GET") {
       const creator = await queryCreator(
         session.access_token
       );
 
-      const privacyOptions =
+      const options =
         creator.privacy_level_options || [];
 
-      const privacyHtml = privacyOptions
+      const privacyHtml = options
         .map(
-          (option) =>
-            `<option value="${option}">${option}</option>`
+          option =>
+            `<option value="${option}">
+              ${option}
+            </option>`
         )
         .join("");
 
       return res.status(200).send(`
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-  <title>Publication TikTok - Psycho Curieux</title>
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+/>
+
+<title>Psycho Curieux</title>
 </head>
 
 <body style="
-  font-family:Arial;
-  max-width:560px;
-  margin:40px auto;
-  padding:20px;
+font-family:Arial;
+max-width:560px;
+margin:40px auto;
+padding:20px;
 ">
 
-  <h1>Publication test TikTok</h1>
+<h1>Publication test TikTok</h1>
 
-  <p>
-    Compte :
-    <strong>${
-      creator.creator_nickname ||
-      creator.creator_username
-    }</strong>
-  </p>
+<p>
+Compte :
+<strong>
+${
+  creator.creator_nickname ||
+  creator.creator_username
+}
+</strong>
+</p>
 
-  <p>
-    Choisis une petite vidéo MP4 pour ce premier test.
-  </p>
+<p>
+Choisis une petite vidéo pour ce premier test.
+</p>
 
-  <form id="publishForm">
+<form id="publishForm">
 
-    <label>Vidéo MP4</label><br><br>
+<label>Vidéo MP4 ou MOV</label>
 
-    <input
-      id="video"
-      type="file"
-      accept="video/mp4"
-      required
-    >
+<br><br>
 
-    <br><br>
+<input
+  id="video"
+  type="file"
+  accept="video/mp4,video/quicktime,.mp4,.mov"
+  required
+/>
 
-    <label>Légende</label><br><br>
+<br><br>
 
-    <textarea
-      id="caption"
-      maxlength="2200"
-      style="width:100%;height:100px;"
-      placeholder="Exemple : Test Psycho Curieux #psychologie"
-    ></textarea>
+<label>Légende</label>
 
-    <br><br>
+<br><br>
 
-    <label>Confidentialité</label><br><br>
+<textarea
+  id="caption"
+  maxlength="2200"
+  style="width:100%;height:100px;"
+  placeholder="Une meilleure version de toi est toujours possible. 🧠✨ #PsychoCurieux"
+></textarea>
 
-    <select
-      id="privacy"
-      required
-      style="width:100%;padding:10px;"
-    >
-      <option value="">
-        Choisir une option
-      </option>
-      ${privacyHtml}
-    </select>
+<br><br>
 
-    <br><br>
+<label>Confidentialité</label>
 
-    <label>
-      <input
-        id="aigc"
-        type="checkbox"
-      >
-      Cette vidéo contient du contenu généré par IA
-    </label>
+<br><br>
 
-    <br><br>
+<select
+  id="privacy"
+  required
+  style="width:100%;padding:10px;"
+>
 
-    <label>
-      <input
-        id="consent"
-        type="checkbox"
-        required
-      >
-      Je confirme vouloir envoyer cette vidéo
-      sur TikTok.
-    </label>
+<option value="">
+Choisir une option
+</option>
 
-    <br><br>
+${privacyHtml}
 
-    <button
-      type="submit"
-      style="
-        width:100%;
-        padding:15px;
-        font-size:18px;
-      "
-    >
-      Publier sur TikTok
-    </button>
-  </form>
+</select>
 
-  <p id="status"
-     style="margin-top:25px;font-weight:bold;">
-  </p>
+<br><br>
+
+<label>
+<input
+  id="aigc"
+  type="checkbox"
+/>
+
+Cette vidéo contient du contenu généré par IA
+</label>
+
+<br><br>
+
+<label>
+<input
+  id="consent"
+  type="checkbox"
+  required
+/>
+
+Je confirme vouloir envoyer cette vidéo sur TikTok.
+</label>
+
+<br><br>
+
+<button
+  type="submit"
+  style="
+  width:100%;
+  padding:15px;
+  font-size:18px;
+  "
+>
+Publier sur TikTok
+</button>
+
+</form>
+
+<p
+  id="status"
+  style="
+  margin-top:25px;
+  font-weight:bold;
+  "
+></p>
 
 <script>
-const form = document.getElementById("publishForm");
-const statusBox = document.getElementById("status");
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+const form =
+  document.getElementById("publishForm");
 
-  const file =
-    document.getElementById("video").files[0];
+const statusBox =
+  document.getElementById("status");
 
-  const caption =
-    document.getElementById("caption").value;
+form.addEventListener(
+  "submit",
+  async event => {
 
-  const privacy =
-    document.getElementById("privacy").value;
+    event.preventDefault();
 
-  const isAigc =
-    document.getElementById("aigc").checked;
+    const file =
+      document.getElementById("video").files[0];
 
-  if (!file) {
-    statusBox.textContent =
-      "Choisis une vidéo.";
-    return;
-  }
+    const caption =
+      document.getElementById("caption").value;
 
-  if (file.type !== "video/mp4") {
-    statusBox.textContent =
-      "Utilise une vidéo MP4.";
-    return;
-  }
+    const privacy =
+      document.getElementById("privacy").value;
 
-  // On garde le premier test simple :
-  // maximum 64 MB, donc un seul chunk.
-  if (file.size > 64 * 1024 * 1024) {
-    statusBox.textContent =
-      "Pour ce test, choisis une vidéo de moins de 64 Mo.";
-    return;
-  }
+    const isAigc =
+      document.getElementById("aigc").checked;
 
-  statusBox.textContent =
-    "Initialisation de la publication...";
-
-  const initResponse = await fetch(
-    "/api/publish",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        action: "init",
-        video_size: file.size,
-        caption,
-        privacy_level: privacy,
-        is_aigc: isAigc
-      })
+    if (!file) {
+      statusBox.textContent =
+        "Choisis une vidéo.";
+      return;
     }
-  );
 
-  const initData = await initResponse.json();
+    const allowedTypes = [
+      "video/mp4",
+      "video/quicktime"
+    ];
 
-  if (!initResponse.ok) {
-    statusBox.textContent =
-      initData.error ||
-      "Erreur lors de l'initialisation.";
-    return;
-  }
-
-  statusBox.textContent =
-    "Envoi de la vidéo vers TikTok...";
-
-  const uploadResponse = await fetch(
-    initData.upload_url,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "video/mp4",
-        "Content-Range":
-          "bytes 0-" +
-          (file.size - 1) +
-          "/" +
-          file.size
-      },
-      body: file
+    if (
+      file.type &&
+      !allowedTypes.includes(file.type)
+    ) {
+      statusBox.textContent =
+        "Utilise une vidéo MP4 ou MOV.";
+      return;
     }
-  );
 
-  if (!uploadResponse.ok) {
+    if (file.size > 64 * 1024 * 1024) {
+      statusBox.textContent =
+        "Choisis une vidéo de moins de 64 Mo.";
+      return;
+    }
+
     statusBox.textContent =
-      "L'envoi de la vidéo a échoué.";
-    return;
-  }
+      "Initialisation de la publication...";
 
-  statusBox.textContent =
-    "Vidéo envoyée. TikTok traite la publication...";
+    try {
 
-  const publishId = initData.publish_id;
+      const initResponse = await fetch(
+        "/api/publish",
+        {
+          method: "POST",
 
-  for (let i = 0; i < 12; i++) {
-    await new Promise(
-      resolve => setTimeout(resolve, 5000)
-    );
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
 
-    const statusResponse = await fetch(
-      "/api/publish",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "status",
-          publish_id: publishId
-        })
+          body: JSON.stringify({
+            action: "init",
+            video_size: file.size,
+            caption: caption,
+            privacy_level: privacy,
+            is_aigc: isAigc
+          })
+        }
+      );
+
+      const initData =
+        await initResponse.json();
+
+      if (!initResponse.ok) {
+        statusBox.textContent =
+          "❌ " +
+          (
+            initData.error ||
+            "Erreur d'initialisation."
+          );
+
+        return;
       }
-    );
 
-    const statusData =
-      await statusResponse.json();
-
-    if (!statusResponse.ok) {
       statusBox.textContent =
-        statusData.error ||
-        "Impossible de vérifier le statut.";
-      return;
-    }
+        "Envoi de la vidéo vers TikTok...";
 
-    if (
-      statusData.status ===
-      "PUBLISH_COMPLETE"
-    ) {
+      const uploadResponse = await fetch(
+        initData.upload_url,
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type":
+              file.type ||
+              "application/octet-stream",
+
+            "Content-Range":
+              "bytes 0-" +
+              (file.size - 1) +
+              "/" +
+              file.size
+          },
+
+          body: file
+        }
+      );
+
+      if (!uploadResponse.ok) {
+        statusBox.textContent =
+          "❌ Envoi de la vidéo échoué.";
+
+        return;
+      }
+
       statusBox.textContent =
-        "✅ Publication TikTok terminée !";
-      return;
-    }
+        "TikTok traite la publication...";
 
-    if (
-      statusData.status ===
-      "FAILED"
-    ) {
+      for (let i = 0; i < 12; i++) {
+
+        await new Promise(
+          resolve =>
+            setTimeout(resolve, 5000)
+        );
+
+        const statusResponse =
+          await fetch(
+            "/api/publish",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+                action: "status",
+                publish_id:
+                  initData.publish_id
+              })
+            }
+          );
+
+        const statusData =
+          await statusResponse.json();
+
+        if (!statusResponse.ok) {
+          statusBox.textContent =
+            "❌ " +
+            (
+              statusData.error ||
+              "Erreur de statut."
+            );
+
+          return;
+        }
+
+        if (
+          statusData.status ===
+          "PUBLISH_COMPLETE"
+        ) {
+          statusBox.textContent =
+            "✅ PUBLICATION TIKTOK RÉUSSIE !";
+
+          return;
+        }
+
+        if (
+          statusData.status === "FAILED"
+        ) {
+          statusBox.textContent =
+            "❌ TikTok a refusé la publication : " +
+            (
+              statusData.fail_reason ||
+              "raison inconnue"
+            );
+
+          return;
+        }
+
+        statusBox.textContent =
+          "TikTok traite la vidéo : " +
+          statusData.status;
+      }
+
       statusBox.textContent =
-        "❌ TikTok a refusé la publication : " +
-        (statusData.fail_reason ||
-         "raison inconnue");
-      return;
-    }
+        "⏳ Toujours en traitement. Vérifie TikTok dans quelques instants.";
 
-    statusBox.textContent =
-      "TikTok traite encore la vidéo : " +
-      statusData.status;
+    } catch (error) {
+
+      statusBox.textContent =
+        "❌ Erreur : " + error.message;
+    }
   }
+);
 
-  statusBox.textContent =
-    "La vidéo est toujours en traitement. Vérifie TikTok dans quelques instants.";
-});
 </script>
 
 </body>
@@ -380,28 +454,35 @@ form.addEventListener("submit", async (event) => {
       `);
     }
 
+    // ==========================
+    // API
+    // ==========================
+
     if (req.method === "POST") {
       const body =
         typeof req.body === "string"
           ? JSON.parse(req.body)
           : req.body;
 
+      // INITIALISATION
       if (body.action === "init") {
-        const creator = await queryCreator(
-          session.access_token
-        );
 
-        const allowedPrivacy =
+        const creator =
+          await queryCreator(
+            session.access_token
+          );
+
+        const privacyOptions =
           creator.privacy_level_options || [];
 
         if (
-          !allowedPrivacy.includes(
+          !privacyOptions.includes(
             body.privacy_level
           )
         ) {
           return res.status(400).json({
             error:
-              "Option de confidentialité invalide."
+              "Confidentialité invalide."
           });
         }
 
@@ -424,32 +505,51 @@ form.addEventListener("submit", async (event) => {
           "https://open.tiktokapis.com/v2/post/publish/video/init/",
           {
             method: "POST",
+
             headers: {
               Authorization:
-                `Bearer ${session.access_token}`,
+                \`Bearer \${session.access_token}\`,
+
               "Content-Type":
-                "application/json; charset=UTF-8",
+                "application/json; charset=UTF-8"
             },
+
             body: JSON.stringify({
+
               post_info: {
+
                 title:
                   body.caption || "",
+
                 privacy_level:
                   body.privacy_level,
+
                 disable_duet:
                   !!creator.duet_disabled,
+
                 disable_comment:
                   !!creator.comment_disabled,
+
                 disable_stitch:
                   !!creator.stitch_disabled,
+
                 is_aigc:
                   !!body.is_aigc
               },
+
               source_info: {
-                source: "FILE_UPLOAD",
-                video_size: videoSize,
-                chunk_size: videoSize,
-                total_chunk_count: 1
+
+                source:
+                  "FILE_UPLOAD",
+
+                video_size:
+                  videoSize,
+
+                chunk_size:
+                  videoSize,
+
+                total_chunk_count:
+                  1
               }
             })
           }
@@ -460,8 +560,10 @@ form.addEventListener("submit", async (event) => {
 
         if (
           !response.ok ||
-          (result.error &&
-           result.error.code !== "ok")
+          (
+            result.error &&
+            result.error.code !== "ok"
+          )
         ) {
           return res.status(400).json({
             error:
@@ -474,22 +576,28 @@ form.addEventListener("submit", async (event) => {
         return res.status(200).json({
           publish_id:
             result.data.publish_id,
+
           upload_url:
             result.data.upload_url
         });
       }
 
+      // STATUT
       if (body.action === "status") {
+
         const response = await fetch(
           "https://open.tiktokapis.com/v2/post/publish/status/fetch/",
           {
             method: "POST",
+
             headers: {
               Authorization:
-                `Bearer ${session.access_token}`,
+                \`Bearer \${session.access_token}\`,
+
               "Content-Type":
-                "application/json; charset=UTF-8",
+                "application/json; charset=UTF-8"
             },
+
             body: JSON.stringify({
               publish_id:
                 body.publish_id
@@ -502,20 +610,23 @@ form.addEventListener("submit", async (event) => {
 
         if (
           !response.ok ||
-          (result.error &&
-           result.error.code !== "ok")
+          (
+            result.error &&
+            result.error.code !== "ok"
+          )
         ) {
           return res.status(400).json({
             error:
               result.error?.message ||
               result.error?.code ||
-              "TikTok status check failed."
+              "Erreur TikTok."
           });
         }
 
         return res.status(200).json({
           status:
             result.data.status,
+
           fail_reason:
             result.data.fail_reason || null
         });
@@ -531,19 +642,21 @@ form.addEventListener("submit", async (event) => {
     );
 
   } catch (error) {
+
     console.error(error);
 
     if (error.message === "NO_SESSION") {
       return res.status(401).send(
-        "TikTok session missing. Reconnect TikTok."
+        "Reconnecte ton compte TikTok."
       );
     }
 
     if (
-      error.message === "SESSION_EXPIRED"
+      error.message ===
+      "SESSION_EXPIRED"
     ) {
       return res.status(401).send(
-        "TikTok session expired. Reconnect TikTok."
+        "Session expirée. Reconnecte TikTok."
       );
     }
 
